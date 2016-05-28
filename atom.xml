@@ -1,0 +1,57 @@
+<?xml version="1.0" encoding="utf-8"?>
+<feed xmlns="http://www.w3.org/2005/Atom">
+  <title>Fan&#39;s Blog</title>
+  <subtitle>Yet another tech blog</subtitle>
+  <link href="/atom.xml" rel="self"/>
+  
+  <link href="http://reachfor.me/"/>
+  <updated>2016-05-28T08:55:31.000Z</updated>
+  <id>http://reachfor.me/</id>
+  
+  <author>
+    <name>Fan Yang</name>
+    
+  </author>
+  
+  <generator uri="http://hexo.io/">Hexo</generator>
+  
+  <entry>
+    <title>你好，世界</title>
+    <link href="http://reachfor.me/zh-CN/2016/05/27/Hello-World/"/>
+    <id>http://reachfor.me/zh-CN/2016/05/27/Hello-World/</id>
+    <published>2016-05-27T13:50:25.000Z</published>
+    <updated>2016-05-28T08:55:31.000Z</updated>
+    
+    <content type="html">&lt;p&gt;又是一个技术博客。&lt;br&gt;尝试用英文和中文双语编写。&lt;br&gt;记录有趣的技术问题并翻译一些有价值的文章。&lt;/p&gt;
+</content>
+    
+    <summary type="html">
+    
+      &lt;p&gt;又是一个技术博客。&lt;br&gt;尝试用英文和中文双语编写。&lt;br&gt;记录有趣的技术问题并翻译一些有价值的文章。&lt;/p&gt;
+
+    
+    </summary>
+    
+    
+  </entry>
+  
+  <entry>
+    <title>Hello World</title>
+    <link href="http://reachfor.me/en/2016/05/27/Hello-World/"/>
+    <id>http://reachfor.me/en/2016/05/27/Hello-World/</id>
+    <published>2016-05-27T11:15:40.000Z</published>
+    <updated>2016-05-28T05:24:45.000Z</updated>
+    
+    <content type="html">&lt;p&gt;Just another tech blog.&lt;br&gt;This blog will be written in both English and Chinese.&lt;br&gt;I will record some interesting tech problems and translate some valuable documents.&lt;/p&gt;
+</content>
+    
+    <summary type="html">
+    
+      &lt;p&gt;Just another tech blog.&lt;br&gt;This blog will be written in both English and Chinese.&lt;br&gt;I will record some interesting tech problems and tra
+    
+    </summary>
+    
+    
+  </entry>
+  
+</feed>
