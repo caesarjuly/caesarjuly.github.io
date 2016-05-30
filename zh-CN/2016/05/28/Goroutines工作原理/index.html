@@ -3,8 +3,11 @@
 <head>
   <meta charset="utf-8">
   
-  <title>Fan&#39;s Blog | Yet another tech blog</title>
+  <title>Goroutines工作原理 | Fan&#39;s Blog | Yet another tech blog</title>
   <meta name="author" content="Fan Yang">
+  
+  <meta name="description" content="引子　　奇文共欣赏，疑义相与析。　　最近在看goroutine相关机制的资料，发现国内资料较少，有一些英文文章写得很不错，打算翻译几篇精品的资料过来。　　此篇是第一篇文章，翻译自Krishna Sundarram的博文How goroutines work。
+Go语言简介　　如果你是第一次接触到Go">
   
   
 
@@ -12,7 +15,7 @@
   <meta name="apple-mobile-web-app-capable" content="yes">
   <meta name="apple-mobile-web-app-status-bar-style" content="black">
 
-  
+  <meta property="og:title" content="Goroutines工作原理"/>
   <meta property="og:site_name" content="Fan&#39;s Blog"/>
 
   
@@ -38,27 +41,26 @@
 <nav id="site-navigation" class="main-navigation" role="navigation">
   <ul>
     
-      <li><a href="/">Home</a></li>
+      <li><a href="/">主页</a></li>
     
-      <li><a href="/archives">Archives</a></li>
+      <li><a href="/archives">归档</a></li>
     
-      <li><a href="/about">About</a></li>
+      <li><a href="/about">关于</a></li>
     
-      <li><a href="/links">Links</a></li>
+      <li><a href="/links">链接</a></li>
     
-      <li><a href="/atom.xml">RSS</a></li>
+      <li><a href="/atom.xml">订阅</a></li>
     
   </ul>
 </nav></header>
 
     <article id="content" class="site-content">
       <main id="main" class="site-main posts-loop" role="main">
-        
-  <article class="post article">
+        <article class="post article">
 
   
   
-    <h3 class="article-title"><a href="/zh-CN/2016/05/28/Goroutines工作原理/"><span>Goroutines工作原理</span></a></h3>
+    <h3 class="article-title"><span>Goroutines工作原理</span></h3>
   
 
 
@@ -116,124 +118,39 @@
           
         </div>
         
-        <div class="article-meta pull-right">
-          <span>
-            <i class="icon-comments"></i>
-            <span>
-              <a href="http://reachfor.me/zh-CN/2016/05/28/Goroutines工作原理/#comment">Comments</a>
-            </span>
-          </span>
-        </div>
-        
     </footer>
   </div>
 </article>
 
-
-
-  <article class="post article">
-
   
-  
-    <h3 class="article-title"><a href="/zh-CN/2016/05/27/Hello-World/"><span>你好，世界</span></a></h3>
-  
+	<section id="comments" class="comment">
+	  <div id="disqus_thread">
+	  <noscript>Please enable JavaScript to view the <a href="//disqus.com/?ref_noscript">comments powered by Disqus.</a></noscript>
+	  </div>
+	</section>
 
-
-  <div class="article-top-meta">
-    <span class="posted-on">
-      <a href="/zh-CN/2016/05/27/Hello-World/" rel="bookmark">
-        <time class="entry-date published" datetime="2016-05-27T13:50:25.000Z">
-          2016-05-27
-        </time>
-      </a>
-    </span>
-  </div>
-
-
-  
-
-  <div class="article-content">
-    <div class="entry">
-      
-        <p>又是一个技术博客。<br>尝试用英文和中文双语编写。<br>记录有趣的技术问题并翻译一些有价值的文章。</p>
-
-      
-    </div>
-    <footer class="article-footer">
-        <div class="article-meta pull-left">
-          
-          
-        </div>
-        
-        <div class="article-meta pull-right">
-          <span>
-            <i class="icon-comments"></i>
-            <span>
-              <a href="http://reachfor.me/zh-CN/2016/05/27/Hello-World/#comment">Comments</a>
-            </span>
-          </span>
-        </div>
-        
-    </footer>
-  </div>
-</article>
-
-
-
-  <article class="post article">
-
-  
-  
-    <h3 class="article-title"><a href="/en/2016/05/27/Hello-World/"><span>Hello World</span></a></h3>
-  
-
-
-  <div class="article-top-meta">
-    <span class="posted-on">
-      <a href="/en/2016/05/27/Hello-World/" rel="bookmark">
-        <time class="entry-date published" datetime="2016-05-27T11:15:40.000Z">
-          2016-05-27
-        </time>
-      </a>
-    </span>
-  </div>
-
-
-  
-
-  <div class="article-content">
-    <div class="entry">
-      
-        <p>Just another tech blog.<br>This blog will be written in both English and Chinese.<br>I will record some interesting tech problems and translate some valuable documents.</p>
-
-      
-    </div>
-    <footer class="article-footer">
-        <div class="article-meta pull-left">
-          
-          
-        </div>
-        
-        <div class="article-meta pull-right">
-          <span>
-            <i class="icon-comments"></i>
-            <span>
-              <a href="http://reachfor.me/en/2016/05/27/Hello-World/#comment">Comments</a>
-            </span>
-          </span>
-        </div>
-        
-    </footer>
-  </div>
-</article>
+	<script type="text/javascript">
+	var disqus_shortname = 'fanyangsblog';
+	(function(){
+	  var dsq = document.createElement('script');
+	  dsq.type = 'text/javascript';
+	  dsq.async = true;
+	  dsq.src = '//' + disqus_shortname + '.disqus.com/embed.js';
+	  (document.getElementsByTagName('head')[0] || document.getElementsByTagName('body')[0]).appendChild(dsq);
+	}());
+	(function(){
+	  var dsq = document.createElement('script');
+	  dsq.type = 'text/javascript';
+	  dsq.async = true;
+	  dsq.src = '//' + disqus_shortname + '.disqus.com/count.js';
+	  (document.getElementsByTagName('head')[0] || document.getElementsByTagName('body')[0]).appendChild(dsq);
+	}());
+	</script>
 
 
 
 
-<nav class="pagination">
-  
-  
-</nav>
+
       </main>
     </article>
 
