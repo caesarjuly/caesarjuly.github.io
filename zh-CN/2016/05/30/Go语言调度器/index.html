@@ -1,0 +1,159 @@
+<!DOCTYPE HTML>
+<html>
+<head>
+  <meta charset="utf-8">
+  
+  <title>Go语言调度器 | Fan&#39;s Blog | Yet another tech blog</title>
+  <meta name="author" content="Fan Yang">
+  
+  <meta name="description" content="引子此篇文章源于Daniel Morsing的The Go scheduler，部分翻译来自于Yi Wang在知乎问题golang的goroutine是如何实现的中的回答。这篇文章写于13年，可能与最新的Go调度器实现有所区别，但是基本原理应该相似，关于Go调度器的演化过程和思想可以参考Analysis of the Go runtime scheduler by Deshpande et al.。">
+  
+  
+
+  <meta id="viewport" name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, minimum-scale=1, user-scalable=no, minimal-ui">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black">
+
+  <meta property="og:title" content="Go语言调度器"/>
+  <meta property="og:site_name" content="Fan&#39;s Blog"/>
+
+  
+    <meta property="og:image" content="undefined"/>
+  
+
+  <link href="/favicon.ico" rel="icon">
+  <link rel="alternate" href="/atom.xml" title="Fan&#39;s Blog" type="application/atom+xml">
+  <link rel="stylesheet" href="/css/style.css" media="screen" type="text/css">
+</head>
+
+
+<body>
+<div id="page" class="site">
+  <div id="primary" class="content-area">
+
+    <header id="header" class="inner"><div class="site-branding">
+  <h1 class="site-title">
+    <a href="/">Fan&#39;s Blog</a>
+  </h1>
+  <p class="site-description">Yet another tech blog</p>
+</div>
+<nav id="site-navigation" class="main-navigation" role="navigation">
+  <ul>
+    
+      <li><a href="/">主页</a></li>
+    
+      <li><a href="/archives">归档</a></li>
+    
+      <li><a href="/about">关于</a></li>
+    
+      <li><a href="/links">链接</a></li>
+    
+      <li><a href="/atom.xml">订阅</a></li>
+    
+  </ul>
+</nav></header>
+
+    <article id="content" class="site-content">
+      <main id="main" class="site-main posts-loop" role="main">
+        <article class="post article">
+
+  
+  
+    <h3 class="article-title"><span>Go语言调度器</span></h3>
+  
+
+
+  <div class="article-top-meta">
+    <span class="posted-on">
+      <a href="/zh-CN/2016/05/30/Go语言调度器/" rel="bookmark">
+        <time class="entry-date published" datetime="2016-05-30T13:50:18.000Z">
+          2016-05-30
+        </time>
+      </a>
+    </span>
+  </div>
+
+
+  
+
+  <div class="article-content">
+    <div class="entry">
+      
+        <h2 id="引子"><a href="#引子" class="headerlink" title="引子"></a>引子</h2><p>此篇文章源于Daniel Morsing的<a href="http://morsmachine.dk/go-scheduler" target="_blank" rel="external">The Go scheduler</a>，部分翻译来自于<a href="https://www.zhihu.com/people/yi-wang-43" target="_blank" rel="external">Yi Wang</a>在知乎问题<a href="https://www.zhihu.com/question/20862617" target="_blank" rel="external">golang的goroutine是如何实现的</a>中的回答。<br>这篇文章写于13年，可能与最新的Go调度器实现有所区别，但是基本原理应该相似，关于Go调度器的演化过程和思想可以参考<a href="http://www1.cs.columbia.edu/~aho/cs6998/reports/12-12-11_DeshpandeSponslerWeiss_GO.pdf" target="_blank" rel="external">Analysis of the Go runtime scheduler by Deshpande et al.</a>。<br><a id="more"></a></p>
+<h2 id="引言"><a href="#引言" class="headerlink" title="引言"></a>引言</h2><p>Go语言1.1版本的一大特性就是Dmitry Vyukov提出的新的调度器的引入。新的调度器使得Go的并行程序性能有着惊人的提升。我觉得应该做的事就是写一篇介绍它的文章。<br>这篇文章中的大部分内容都在<a href="https://docs.google.com/document/d/1TTj4T2JO42uD5ID9e89oa0sLKhJYD0Y_kqxDv3I3XMw" target="_blank" rel="external">原始设计文档</a>中描述过。本篇文章从技术角度帮助理解调度器的工作机制。<br>所有你需要知道的关于新调度器的信息在设计文档中都可以找到，不过本篇文章包含很多图片，更好理解。</p>
+<h2 id="Go运行时为什么需要调度器"><a href="#Go运行时为什么需要调度器" class="headerlink" title="Go运行时为什么需要调度器"></a>Go运行时为什么需要调度器</h2><p>在我们阐述新的调度器之前，需要先理解为什么需要它。既然操作系统提供线程调度，我们还需要创造一个用户态的调度器呢？<br>POSIX线程API很大程度上是对原有Unix进程模型的逻辑扩展，因此线程调度起来大体上跟进程类似。线程拥有他们自己的信号掩码，可以设置CPU亲和度，可以被放进cgroups，可以查询他们使用的资源。所有这些特性都是Go语言调度goroutines并不需要的，而且都增加了额外的开销，并且当你拥有10w个线程时会迅速增加。<br>另外一个问题是基于Go语言的模型，系统并不能做出合适的调度决策。比如，当进行垃圾回收时，Go语言的GC会要求所有线程暂停，内存也必须处理一致的状态。这就会需要等待运行的线程达到一个我们能够确定内存一致的时间点，如果依靠OS自身的调度器来调度，那么会有大量的线程需要停止工作。<br>当你拥有很多在随机时间点进行调度的线程时，很有可能你要等待很多线程达到一致的状态。Go语言调度器能知道什么时候内存是一致的，并且能决定只在内存一致时做出调度。这意味着，当我们暂停线程进行垃圾回收时，我们只需要等待那些正在CPU核心上执行的线程就可以了，而不是等待所有的线程。</p>
+<h2 id="调度器模型"><a href="#调度器模型" class="headerlink" title="调度器模型"></a>调度器模型</h2>
+      
+    </div>
+    <footer class="article-footer">
+        <div class="article-meta pull-left">
+          
+  
+
+  <span class="post-categories">
+    <i class="icon-categories"></i>
+    <a href="/categories/Golang/">Golang</a>
+  </span>
+
+
+          
+  
+
+  <span class="post-tags">
+    <i class="icon-tags"></i>
+    <a href="/tags/scheduler/">scheduler</a>
+  </span>
+
+
+        </div>
+        
+    </footer>
+  </div>
+</article>
+
+  
+	<section id="comments" class="comment">
+	  <div id="disqus_thread">
+	  <noscript>Please enable JavaScript to view the <a href="//disqus.com/?ref_noscript">comments powered by Disqus.</a></noscript>
+	  </div>
+	</section>
+
+	<script type="text/javascript">
+	var disqus_shortname = 'fanyangsblog';
+	(function(){
+	  var dsq = document.createElement('script');
+	  dsq.type = 'text/javascript';
+	  dsq.async = true;
+	  dsq.src = '//' + disqus_shortname + '.disqus.com/embed.js';
+	  (document.getElementsByTagName('head')[0] || document.getElementsByTagName('body')[0]).appendChild(dsq);
+	}());
+	(function(){
+	  var dsq = document.createElement('script');
+	  dsq.type = 'text/javascript';
+	  dsq.async = true;
+	  dsq.src = '//' + disqus_shortname + '.disqus.com/count.js';
+	  (document.getElementsByTagName('head')[0] || document.getElementsByTagName('body')[0]).appendChild(dsq);
+	}());
+	</script>
+
+
+
+
+
+      </main>
+    </article>
+
+    <footer id="colophon" class="site-footer" role="contentinfo"><p class="site-info">
+  Proudly powered by <a href="https://hexo.io/" target="_blank">Hexo</a> and
+  Theme by <a href="https://github.com/CodeDaraW/Hacker" target="_blank">Hacker</a>
+  </br>
+  
+  &copy; 2016 Fan Yang
+  
+</p>
+</footer>
+    
+  </div>
+</div>
+</body>
+</html>
