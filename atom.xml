@@ -5,7 +5,7 @@
   <link href="/atom.xml" rel="self"/>
   
   <link href="http://reachfor.me/"/>
-  <updated>2016-05-30T06:50:58.000Z</updated>
+  <updated>2016-05-30T07:05:48.000Z</updated>
   <id>http://reachfor.me/</id>
   
   <author>
@@ -20,9 +20,9 @@
     <link href="http://reachfor.me/zh-CN/2016/05/28/Goroutines%E5%B7%A5%E4%BD%9C%E5%8E%9F%E7%90%86/"/>
     <id>http://reachfor.me/zh-CN/2016/05/28/Goroutines工作原理/</id>
     <published>2016-05-28T08:58:09.000Z</published>
-    <updated>2016-05-30T06:50:58.000Z</updated>
+    <updated>2016-05-30T07:05:48.000Z</updated>
     
-    <content type="html">&lt;h2 id=&quot;引子&quot;&gt;&lt;a href=&quot;#引子&quot; class=&quot;headerlink&quot; title=&quot;引子&quot;&gt;&lt;/a&gt;引子&lt;/h2&gt;&lt;p&gt;　　奇文共欣赏，疑义相与析。&lt;br&gt;　　最近在看goroutine相关机制的资料，发现国内资料较少，有一些英文文章写得很不错，打算翻译几篇精品的资料过来。&lt;br&gt;　　此篇是第一篇文章，翻译自Krishna Sundarram的博文&lt;a href=&quot;http://blog.nindalf.com/how-goroutines-work/&quot; target=&quot;_blank&quot; rel=&quot;external&quot;&gt;How goroutines work&lt;/a&gt;。&lt;/p&gt;
+    <content type="html">&lt;h2 id=&quot;引子&quot;&gt;&lt;a href=&quot;#引子&quot; class=&quot;headerlink&quot; title=&quot;引子&quot;&gt;&lt;/a&gt;引子&lt;/h2&gt;&lt;p&gt;　　奇文共欣赏，疑义相与析。&lt;br&gt;　　最近在看goroutine相关机制的资料，发现国内资料较少，有一些英文文章写得很不错，打算翻译几篇精品的资料过来。&lt;br&gt;　　此篇是第一篇文章，翻译自Krishna Sundarram的博文&lt;a href=&quot;http://blog.nindalf.com/how-goroutines-work/&quot; target=&quot;_blank&quot; rel=&quot;external&quot;&gt;How goroutines work&lt;/a&gt;。&lt;br&gt;&lt;a id=&quot;more&quot;&gt;&lt;/a&gt;&lt;/p&gt;
 &lt;h2 id=&quot;Go语言简介&quot;&gt;&lt;a href=&quot;#Go语言简介&quot; class=&quot;headerlink&quot; title=&quot;Go语言简介&quot;&gt;&lt;/a&gt;Go语言简介&lt;/h2&gt;&lt;p&gt;　　如果你是第一次接触到Go语言或者没听说过“并发不是并行”这句话，那么请先看一下Rob Pike关于这个主题的&lt;a href=&quot;http://www.youtube.com/watch?v=cN_DpYBzKso&quot; target=&quot;_blank&quot; rel=&quot;external&quot;&gt;精彩演讲&lt;/a&gt;。这个视频有30分钟长，我保证这30分钟绝不会浪费。&lt;br&gt;　　总结一下区别——“当人们听到并发时经常会想到并行这个相关但是其实很不一样的概念，在编程中，并发是独立执行进程的组合，而并行指的是（很可能相关）计算进程的同时执行。并发是关于同时处理很多件事情，而并行是关于同时做很多件事情。”&lt;sup&gt;[1]&lt;/sup&gt;&lt;br&gt;　　Go语言允许我们进行并发程序的编写。它提供了goroutines，更重要是提供了goroutines之间通讯的机制。我将会着重阐述前者。&lt;/p&gt;
 &lt;h2 id=&quot;Goroutines和线程——区别&quot;&gt;&lt;a href=&quot;#Goroutines和线程——区别&quot; class=&quot;headerlink&quot; title=&quot;Goroutines和线程——区别&quot;&gt;&lt;/a&gt;Goroutines和线程——区别&lt;/h2&gt;&lt;p&gt;　　Go使用goroutines进行并发编程，而java之类的语言却使用线程。区别在哪里？我们从内存消耗，初始化销毁和切换时间三个方面来进行比较。&lt;/p&gt;
 &lt;h3 id=&quot;内存消耗&quot;&gt;&lt;a href=&quot;#内存消耗&quot; class=&quot;headerlink&quot; title=&quot;内存消耗&quot;&gt;&lt;/a&gt;内存消耗&lt;/h3&gt;&lt;p&gt;　　Goroutines的创建并不需要消耗很多内存——只需要2KB的栈空间。它会根据需要申请和释放堆内存空间。&lt;sup&gt;[2][3]&lt;/sup&gt;而线程创建时就需要1MB内存（goroutine的大约500倍），同时会申请一块叫做“守卫(guard)”的内存页来分割不同线程的内存区域。&lt;sup&gt;[7]&lt;/sup&gt;&lt;br&gt;　　服务器每接受一个请求就创建一个goroutines来进行处理是没问题的，但如果每个就请求创建一个线程最终会导致可怕的内存耗尽错误（OutOfMemoryError）。这不仅限于java语言——任何使用系统线程作为他们处理并发的主要工具的语言都会遇到这个问题。&lt;/p&gt;
@@ -55,10 +55,14 @@
     
     <summary type="html">
     
-      &lt;h2 id=&quot;引子&quot;&gt;&lt;a href=&quot;#引子&quot; class=&quot;headerlink&quot; title=&quot;引子&quot;&gt;&lt;/a&gt;引子&lt;/h2&gt;&lt;p&gt;　　奇文共欣赏，疑义相与析。&lt;br&gt;　　最近在看goroutine相关机制的资料，发现国内资料较少，有一些英文文章写得很不错，打算翻译几篇精
+      &lt;h2 id=&quot;引子&quot;&gt;&lt;a href=&quot;#引子&quot; class=&quot;headerlink&quot; title=&quot;引子&quot;&gt;&lt;/a&gt;引子&lt;/h2&gt;&lt;p&gt;　　奇文共欣赏，疑义相与析。&lt;br&gt;　　最近在看goroutine相关机制的资料，发现国内资料较少，有一些英文文章写得很不错，打算翻译几篇精品的资料过来。&lt;br&gt;　　此篇是第一篇文章，翻译自Krishna Sundarram的博文&lt;a href=&quot;http://blog.nindalf.com/how-goroutines-work/&quot;&gt;How goroutines work&lt;/a&gt;。&lt;br&gt;
     
     </summary>
     
+      <category term="Golang" scheme="http://reachfor.me/categories/Golang/"/>
+    
+    
+      <category term="goroutine" scheme="http://reachfor.me/tags/goroutine/"/>
     
   </entry>
   
