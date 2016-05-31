@@ -6,7 +6,10 @@
   <title>Go语言调度器 | Fan&#39;s Blog | Yet another tech blog</title>
   <meta name="author" content="Fan Yang">
   
-  <meta name="description" content="引子此篇文章源于Daniel Morsing的The Go scheduler，部分翻译来自于Yi Wang在知乎问题golang的goroutine是如何实现的中的回答。这篇文章写于13年，可能与最新的Go调度器实现有所区别，但是基本原理应该相似，关于Go调度器的演化过程和思想可以参考Analysis of the Go runtime scheduler by Deshpande et al.。">
+  <meta name="description" content="引子此篇文章源于Daniel Morsing的The Go scheduler，部分翻译来自于Yi Wang在知乎问题golang的goroutine是如何实现的中的回答。这篇文章写于13年，可能与最新的Go调度器实现有所区别，但是基本原理应该相似，关于Go调度器的演化过程和思想可以参考Analysis of the Go runtime scheduler by Deshpande et al.。有两点请注意：
+
+原文中将P理解为context上下文，我认为不太合适，所以在翻译时尽量避免使用上下文这个词，根据Analysis of the Go runtime scheduler提到的概念，P应该是一个逻辑或者说模拟处理器，线程在执行时必须获取到P。P的引入，一方面减少内存空间占用（主要是减少以前M结构的cache占用），一方面打散runqueue任务，并且加了动态分配任务或者切换线程的调度策略，从而避免空转或者阻塞。
+系统调用一章谈到，M对P的放弃或者获取，其实是通过两种M的自旋锁来实现的，并不是P主动去切换。">
   
   
 
@@ -79,10 +82,19 @@
   <div class="article-content">
     <div class="entry">
       
-        <h2 id="引子"><a href="#引子" class="headerlink" title="引子"></a>引子</h2><p>此篇文章源于Daniel Morsing的<a href="http://morsmachine.dk/go-scheduler" target="_blank" rel="external">The Go scheduler</a>，部分翻译来自于<a href="https://www.zhihu.com/people/yi-wang-43" target="_blank" rel="external">Yi Wang</a>在知乎问题<a href="https://www.zhihu.com/question/20862617" target="_blank" rel="external">golang的goroutine是如何实现的</a>中的回答。<br>这篇文章写于13年，可能与最新的Go调度器实现有所区别，但是基本原理应该相似，关于Go调度器的演化过程和思想可以参考<a href="http://www1.cs.columbia.edu/~aho/cs6998/reports/12-12-11_DeshpandeSponslerWeiss_GO.pdf" target="_blank" rel="external">Analysis of the Go runtime scheduler by Deshpande et al.</a>。<br><a id="more"></a></p>
+        <h2 id="引子"><a href="#引子" class="headerlink" title="引子"></a>引子</h2><p>此篇文章源于Daniel Morsing的<a href="http://morsmachine.dk/go-scheduler" target="_blank" rel="external">The Go scheduler</a>，部分翻译来自于<a href="https://www.zhihu.com/people/yi-wang-43" target="_blank" rel="external">Yi Wang</a>在知乎问题<a href="https://www.zhihu.com/question/20862617" target="_blank" rel="external">golang的goroutine是如何实现的</a>中的回答。<br>这篇文章写于13年，可能与最新的Go调度器实现有所区别，但是基本原理应该相似，关于Go调度器的演化过程和思想可以参考<a href="http://www1.cs.columbia.edu/~aho/cs6998/reports/12-12-11_DeshpandeSponslerWeiss_GO.pdf" target="_blank" rel="external">Analysis of the Go runtime scheduler by Deshpande et al.</a>。<br>有两点请注意：</p>
+<ul>
+<li>原文中将P理解为context上下文，我认为不太合适，所以在翻译时尽量避免使用上下文这个词，根据Analysis of the Go runtime scheduler提到的概念，P应该是一个逻辑或者说模拟处理器，线程在执行时必须获取到P。P的引入，一方面减少内存空间占用（主要是减少以前M结构的cache占用），一方面打散runqueue任务，并且加了动态分配任务或者切换线程的调度策略，从而避免空转或者阻塞。</li>
+<li>系统调用一章谈到，M对P的放弃或者获取，其实是通过两种M的自旋锁来实现的，并不是P主动去切换。<a id="more"></a>
+</li>
+</ul>
 <h2 id="引言"><a href="#引言" class="headerlink" title="引言"></a>引言</h2><p>Go语言1.1版本的一大特性就是Dmitry Vyukov提出的新的调度器的引入。新的调度器使得Go的并行程序性能有着惊人的提升。我觉得应该做的事就是写一篇介绍它的文章。<br>这篇文章中的大部分内容都在<a href="https://docs.google.com/document/d/1TTj4T2JO42uD5ID9e89oa0sLKhJYD0Y_kqxDv3I3XMw" target="_blank" rel="external">原始设计文档</a>中描述过。本篇文章从技术角度帮助理解调度器的工作机制。<br>所有你需要知道的关于新调度器的信息在设计文档中都可以找到，不过本篇文章包含很多图片，更好理解。</p>
 <h2 id="Go运行时为什么需要调度器"><a href="#Go运行时为什么需要调度器" class="headerlink" title="Go运行时为什么需要调度器"></a>Go运行时为什么需要调度器</h2><p>在我们阐述新的调度器之前，需要先理解为什么需要它。既然操作系统提供线程调度，我们还需要创造一个用户态的调度器呢？<br>POSIX线程API很大程度上是对原有Unix进程模型的逻辑扩展，因此线程调度起来大体上跟进程类似。线程拥有他们自己的信号掩码，可以设置CPU亲和度，可以被放进cgroups，可以查询他们使用的资源。所有这些特性都是Go语言调度goroutines并不需要的，而且都增加了额外的开销，并且当你拥有10w个线程时会迅速增加。<br>另外一个问题是基于Go语言的模型，系统并不能做出合适的调度决策。比如，当进行垃圾回收时，Go语言的GC会要求所有线程暂停，内存也必须处理一致的状态。这就会需要等待运行的线程达到一个我们能够确定内存一致的时间点，如果依靠OS自身的调度器来调度，那么会有大量的线程需要停止工作。<br>当你拥有很多在随机时间点进行调度的线程时，很有可能你要等待很多线程达到一致的状态。Go语言调度器能知道什么时候内存是一致的，并且能决定只在内存一致时做出调度。这意味着，当我们暂停线程进行垃圾回收时，我们只需要等待那些正在CPU核心上执行的线程就可以了，而不是等待所有的线程。</p>
-<h2 id="调度器模型"><a href="#调度器模型" class="headerlink" title="调度器模型"></a>调度器模型</h2>
+<h2 id="调度器模型"><a href="#调度器模型" class="headerlink" title="调度器模型"></a>调度器模型</h2><p>线程通常有三种模型。一种是N:1模型，N个用户态线程对应一个系统线程，这种模型优势是可以进行快速的上下文切换，但是却不能利用多核系统的优势。另外一种是1：1模型，一个正在执行的用户态线程对应一个系统线程，这种模型利用了多核的优势，但是上下文切换却很慢，因为需要陷入内核通过系统进行调度。<br>Go语言试图使用M：N模型来结合前两种模型的优势。它将任意数量的用户态线程映射到数个系统线程上。这样既可以进行快速的上下文切换，也可以充分利用多核架构。唯一是劣势是增加了调度器的实现复杂度。<br>为了完成调度任务，Go语言调度器设计使用了三个逻辑实体：<br><img src="/zh-CN/2016/05/30/Go语言调度器/our-cast.jpg" alt="实体" title="实体"><br>三角形M(Machine)代表系统线程。它就是系统管理的线程，工作起来跟标准POSIX线程基本一致。<br>圆形G代表一个goroutine。它包括堆栈，指令指针和其他调度需要的重要信息，像隧道一样它可能被阻塞。<br>长方形P(Processor)代表调度的一个上下文。你可以把它看做一个局部的调度器，在一个单独的线程上执行Go代码。它是使得Go的调度模型从N：1演变成M：N的核心部分。<br><img src="/zh-CN/2016/05/30/Go语言调度器/in-motion.jpg" alt="关联" title="关联"><br>上图中有两个线程M，每一个线程拥有一个P实体，每个P运行着一个goroutine(G)。为了运行goroutine，线程必须拥有一个P。<br>P的个数由GOMAXPROCS环境变量决定，或者通过GOMAXPROCS()函数进行设置。通常在程序执行中不会改变。P的数量固定意味着在任意时间点只有GOMAXPROCS个Go程序在执行。我们可以用这个数值来调节使用的核心个数，比如在4核PC上使用4个线程执行Go程序。<br>灰色的goroutine没有被执行，但是处于就绪状态，随时可以被调度。它们排列在一个runqueue的链表上。当调用”go”关键字创建goroutine时，新建的goroutine就被插入到链表末尾。当P执行goroutine到达一个调度时间点时，就从链表中取出一个新的goroutine，把栈指针和指令指针设置成新的值，然后开始执行新的goroutine。<br>为了减少锁竞争，每个P都有自己的局部runqueue。在之前的版本中的调度器只有一个拥有互斥锁的全局runqueue。线程经常因为等待锁而被阻塞。当你拥有32核的PC时，情况就会变得很糟糕。<br>只要所有的P有goroutine需要执行，调度器就会一直稳定的进行调度。但是，存在一些特殊场景。</p>
+<h2 id="系统调用"><a href="#系统调用" class="headerlink" title="系统调用"></a>系统调用</h2><p>你可能会好奇，究竟为什么需要P？为什么不直接把runqueue放到线程上？这样做主要是因为，当线程被阻塞时，P可以转向其他线程。<br>比如，当我们需要进行进行系统调用时。因为线程因为系统调用阻塞时并不能执行代码，P就需要转向其他线程，继续进行调度。<br><img src="/zh-CN/2016/05/30/Go语言调度器/syscall.jpg" alt="阻塞实例" title="阻塞实例"><br>如图所示，线程M0放弃了P，这样M1就可以使用P执行任务。调度器确保会有足够多的线程来使用所有的P，M1可能只是为了处理系统调用而被创建或者直接从线程缓存中获取。M0会继续绑定在执行系统调用的G0上，因为实际上它还是在运行，只是被阻塞罢了。<br>当系统调用返回时，M0必须重新获取到P来继续执行goroutine。一般情况下回从其他线程那获取到P。如果获取不到，它会把goroutine放到全局runqueue中，并把自己放到线程缓存中然后进入睡眠状态。<br>当P的局部runqueue中没有goroutine时，它们就会从全局runqueue中获取。P也会定期检查全局runqueue。否则全局队列中的goroutine就可能会被饿死。<br>Go使用多线程来处理系统调用，即使当GOMAXPROCS被设置为1时也是如此（即用多个线程来防止系统调用导致的阻塞）。</p>
+<h2 id="获取goroutine"><a href="#获取goroutine" class="headerlink" title="获取goroutine"></a>获取goroutine</h2><p>另一种让调度变得不和谐的的情况是，P执行完所有自己的goroutine任务。当不同P上的runqueue不平衡时，就会导致有的P无事可做，而另外一些却很忙。为了继续执行Go代码，P可以从全局runqueue中取出goroutine，但是如果全局runqueue也为空，我们就必须从其他地方获取goroutine。<br><img src="/zh-CN/2016/05/30/Go语言调度器/steal.jpg" alt="获取任务" title="获取任务"><br>其他地方就是其他的P。当一个P的goroutine执行完后，它会尝试从其他P的runqueue中获取一半的goroutine。这就确保所有的P上都有活可以干，也就保证了所有的线程都处在饱和工作的状态。</p>
+<h2 id="后记"><a href="#后记" class="headerlink" title="后记"></a>后记</h2><p>关于调度器还有很多细节没有说，比如cgo线程，LockOSThread()方法，与网络轮询集成等等。这些不是本篇文章要讨论的内容，但也值得学习。我可能会继续写一些关于这些细节的文章。Go运行时库肯定还有很多有趣的东西有待发掘。</p>
+
       
     </div>
     <footer class="article-footer">

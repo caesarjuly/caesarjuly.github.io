@@ -78,7 +78,10 @@
   <div class="article-content">
     <div class="entry">
       
-        <h2 id="引子"><a href="#引子" class="headerlink" title="引子"></a>引子</h2><p>此篇文章源于Daniel Morsing的<a href="http://morsmachine.dk/go-scheduler">The Go scheduler</a>，部分翻译来自于<a href="https://www.zhihu.com/people/yi-wang-43">Yi Wang</a>在知乎问题<a href="https://www.zhihu.com/question/20862617">golang的goroutine是如何实现的</a>中的回答。<br>这篇文章写于13年，可能与最新的Go调度器实现有所区别，但是基本原理应该相似，关于Go调度器的演化过程和思想可以参考<a href="http://www1.cs.columbia.edu/~aho/cs6998/reports/12-12-11_DeshpandeSponslerWeiss_GO.pdf">Analysis of the Go runtime scheduler by Deshpande et al.</a>。<br>
+        <h2 id="引子"><a href="#引子" class="headerlink" title="引子"></a>引子</h2><p>此篇文章源于Daniel Morsing的<a href="http://morsmachine.dk/go-scheduler">The Go scheduler</a>，部分翻译来自于<a href="https://www.zhihu.com/people/yi-wang-43">Yi Wang</a>在知乎问题<a href="https://www.zhihu.com/question/20862617">golang的goroutine是如何实现的</a>中的回答。<br>这篇文章写于13年，可能与最新的Go调度器实现有所区别，但是基本原理应该相似，关于Go调度器的演化过程和思想可以参考<a href="http://www1.cs.columbia.edu/~aho/cs6998/reports/12-12-11_DeshpandeSponslerWeiss_GO.pdf">Analysis of the Go runtime scheduler by Deshpande et al.</a>。<br>有两点请注意：</p>
+<ul>
+<li>原文中将P理解为context上下文，我认为不太合适，所以在翻译时尽量避免使用上下文这个词，根据Analysis of the Go runtime scheduler提到的概念，P应该是一个逻辑或者说模拟处理器，线程在执行时必须获取到P。P的引入，一方面减少内存空间占用（主要是减少以前M结构的cache占用），一方面打散runqueue任务，并且加了动态分配任务或者切换线程的调度策略，从而避免空转或者阻塞。</li>
+<li>系统调用一章谈到，M对P的放弃或者获取，其实是通过两种M的自旋锁来实现的，并不是P主动去切换。
       
     </div>
     <footer class="article-footer">
